@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gotosocial.fullname" . }}
+  labels:
+    {{- include "gotosocial.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  {{- if eq .Values.gotosocial.storage.dbType "sqlite" }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "gotosocial.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "gotosocial.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "gotosocial.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.gotosocial.initialUser.enabled }}
+      initContainers:
+        - name: {{ include "gotosocial.fullname" . }}-create-first-user
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /gotosocial/gotosocial
+            - admin
+            - account
+            - create
+            - --username
+            - {{ .Values.gotosocial.initialUser.username }}
+            - --email
+            - {{ .Values.gotosocial.initialUser.email }}
+            - --password
+            - {{ .Values.gotosocial.initialUser.password }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "gotosocial.fullname" . }}-env
+          volumeMounts:
+            - name: database
+              mountPath: {{ .Values.gotosocial.storage.basePath }}
+        - name: {{ include "gotosocial.fullname" . }}-promote-user
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /gotosocial/gotosocial
+            - admin
+            - account
+            - promote
+            - --username
+            - {{ .Values.gotosocial.initialUser.username }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "gotosocial.fullname" . }}-env
+          volumeMounts:
+            - name: database
+              mountPath: {{ .Values.gotosocial.storage.basePath }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "gotosocial.fullname" . }}-env
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          volumeMounts:
+            - name: database
+              mountPath: {{ .Values.gotosocial.storage.basePath }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        {{- if .Values.gotosocial.storage.persistence.enabled }}
+        - name: database
+          persistentVolumeClaim:
+            claimName: {{ include "gotosocial.fullname" . }}-claim
+        {{- else }}
+        - name: database
+          emptyDir: {}  
+        {{- end }}
+      

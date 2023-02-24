@@ -1,0 +1,13 @@
+{{- if .Values.gotosocial.storage.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "gotosocial.fullname" . }}-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.gotosocial.storage.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.gotosocial.storage.persistence.size }}
+{{- end }}

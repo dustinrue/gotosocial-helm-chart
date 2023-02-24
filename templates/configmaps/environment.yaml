@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gotosocial.fullname" . }}-env
+  labels:
+    {{- include "gotosocial.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/resource-policy": keep
+    "helm.sh/hook-weight": "-1"
+data:
+  GTS_HOST: {{ .Values.gotosocial.host }}
+  GTS_STORAGE_LOCAL_BASE_PATH: {{ .Values.gotosocial.storage.basePath }}
+  GTS_DB_TYPE: {{ .Values.gotosocial.storage.dbType }}
+  GTS_DB_ADDRESS: {{ .Values.gotosocial.storage.basePath }}/sqlite.db
+  GTS_LETSENCRYPT_ENABLED: "false"
+  GTS_LETSENCRYPT_EMAIL_ADDRESS: ""
+  GTS_PORT: "80"
+  GTS_ACCOUNTS_REGISTRATION_OPTION: "false"
+  ## For reverse proxy setups:
+  # GTS_TRUSTED_PROXIES: "172.x.x.x"
+  
